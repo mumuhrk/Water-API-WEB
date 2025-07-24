@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "ระบบอ่านมิเตอร์น้ำ",
   description: "ระบบอัพโหลดรูปและอ่านค่ามิเตอร์น้ำอัตโนมัติ",
-    generator: 'v0.dev'
+    generator: 'Sujinda'
 }
 
 export default function RootLayout({
