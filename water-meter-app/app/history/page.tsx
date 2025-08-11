@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, BuildingIcon, Home, Droplets, RotateCcw } from "lucide-react"
+import { Calendar, BuildingIcon, Home, Droplets, RotateCcw } from 'lucide-react'
 import Image from "next/image"
 
 interface Room {
@@ -24,6 +24,7 @@ interface MeterReading {
   created_at: string
   building_id: string
   room_id: string
+  digit_details: { predicted_class: string; mapped_value: string }[] | null
 }
 
 interface Building {
@@ -33,7 +34,7 @@ interface Building {
 
 export default function HistoryPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
-  const [rooms, setRooms] = useState<Room[]>([])
+  const [rooms, setRooms] = useState<Room[]>([]) // all rooms for the user
   const [readings, setReadings] = useState<MeterReading[]>([])
   const [filteredReadings, setFilteredReadings] = useState<MeterReading[]>([])
   const [selectedBuilding, setSelectedBuilding] = useState<string>("all")
@@ -49,16 +50,6 @@ export default function HistoryPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedBuilding !== "all") {
-      fetchRooms(selectedBuilding)
-      setSelectedRoom("all")
-    } else {
-      setRooms([])
-      setSelectedRoom("all")
-    }
-  }, [selectedBuilding])
-
-  useEffect(() => {
     filterReadings()
   }, [readings, selectedBuilding, selectedRoom])
 
@@ -70,8 +61,7 @@ export default function HistoryPage() {
       if (!user) {
         router.push("/auth/login")
       }
-    } catch (error) {
-      console.error("Auth check error:", error)
+    } catch {
       router.push("/auth/login")
     }
   }
@@ -79,7 +69,7 @@ export default function HistoryPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchBuildings(), fetchReadings()])
+      await Promise.all([fetchBuildings(), fetchAllRooms(), fetchReadings()])
     } finally {
       setLoading(false)
     }
@@ -97,9 +87,9 @@ export default function HistoryPage() {
     }
   }
 
-  const fetchRooms = async (buildingId: string) => {
+  const fetchAllRooms = async () => {
     try {
-      const response = await fetch(`/api/rooms?buildingId=${buildingId}`)
+      const response = await fetch(`/api/rooms`)
       if (response.ok) {
         const data = await response.json()
         setRooms(data)
@@ -115,11 +105,10 @@ export default function HistoryPage() {
         .from("meter_readings")
         .select("*")
         .order("created_at", { ascending: false })
-
       if (error) {
         console.error("Error fetching readings:", error)
       } else {
-        setReadings(data || [])
+        setReadings((data as MeterReading[]) || [])
       }
     } catch (error) {
       console.error("Error fetching readings:", error)
@@ -128,15 +117,12 @@ export default function HistoryPage() {
 
   const filterReadings = () => {
     let filtered = readings
-
     if (selectedBuilding !== "all") {
       filtered = filtered.filter((reading) => reading.building_id === selectedBuilding)
     }
-
     if (selectedRoom !== "all") {
       filtered = filtered.filter((reading) => reading.room_id === selectedRoom)
     }
-
     setFilteredReadings(filtered)
   }
 
@@ -162,10 +148,7 @@ export default function HistoryPage() {
 
   const getRoomName = (roomId: string) => {
     const room = rooms.find((r) => r.id === roomId)
-    if (room) return room.name
-
-    // If room not in current filtered rooms, try to find from all buildings
-    return "ไม่ระบุ"
+    return room?.name || "ไม่ระบุ"
   }
 
   if (loading) {
@@ -183,18 +166,18 @@ export default function HistoryPage() {
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-3xl font-bold">ประวัติการอ่านค่า</h1>
-        <p className="text-muted-foreground mt-2">ดูประวัติการอ่านค่ามิเตอร์น้ำทั้งหมดของคุณ</p>
+        <p className="text-muted-foreground mt-2">ดูค่าที่อ่านได้, รายละเอียดตัวเลข, วันที่ และรูปภาพ แยกตามตึก/ห้อง</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>ตัวกรองข้อมูล</CardTitle>
-          <CardDescription>เลือกตึกและห้องเพื่อกรองข้อมูลที่ต้องการดู</CardDescription>
+          <CardDescription>เลือกตึกและห้องเพื่อกรองข้อมูล</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="building-filter">ตึก</Label>
+              <Label>ตึก</Label>
               <Select value={selectedBuilding} onValueChange={setSelectedBuilding}>
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกตึก" />
@@ -206,21 +189,24 @@ export default function HistoryPage() {
                       ทั้งหมด
                     </div>
                   </SelectItem>
-                  {buildings.map((building) => (
-                    <SelectItem key={building.id} value={building.id}>
+                  {buildings.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
                       <div className="flex items-center">
                         <BuildingIcon className="h-4 w-4 mr-2" />
-                        {building.name}
+                        {b.name}
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="room-filter">ห้อง</Label>
-              <Select value={selectedRoom} onValueChange={setSelectedRoom} disabled={selectedBuilding === "all"}>
+              <Label>ห้อง</Label>
+              <Select
+                value={selectedRoom}
+                onValueChange={setSelectedRoom}
+                disabled={selectedBuilding === "all"}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกห้อง" />
                 </SelectTrigger>
@@ -231,18 +217,19 @@ export default function HistoryPage() {
                       ทั้งหมด
                     </div>
                   </SelectItem>
-                  {rooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id}>
-                      <div className="flex items-center">
-                        <Home className="h-4 w-4 mr-2" />
-                        {room.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {rooms
+                    .filter((r) => selectedBuilding === "all" || r.building_id === selectedBuilding)
+                    .map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        <div className="flex items-center">
+                          <Home className="h-4 w-4 mr-2" />
+                          {r.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>&nbsp;</Label>
               <Button variant="outline" onClick={resetFilters} className="w-full bg-transparent">
@@ -254,11 +241,9 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge variant="secondary">{filteredReadings.length} รายการ</Badge>
-          {(selectedBuilding !== "all" || selectedRoom !== "all") && <Badge variant="outline">กรองแล้ว</Badge>}
-        </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">{filteredReadings.length} รายการ</Badge>
+        {(selectedBuilding !== "all" || selectedRoom !== "all") && <Badge variant="outline">กรองแล้ว</Badge>}
       </div>
 
       {filteredReadings.length === 0 ? (
@@ -266,9 +251,7 @@ export default function HistoryPage() {
           <CardContent className="text-center py-12">
             <Droplets className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">ไม่มีข้อมูล</h3>
-            <p className="text-muted-foreground">
-              {readings.length === 0 ? "ยังไม่มีการอ่านค่ามิเตอร์ กรุณาอัพโหลดรูปภาพมิเตอร์ก่อน" : "ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่เลือก"}
-            </p>
+            <p className="text-muted-foreground">ยังไม่มีการอ่านค่ามิเตอร์ หรือไม่พบข้อมูลตามตัวกรอง</p>
           </CardContent>
         </Card>
       ) : (
@@ -299,15 +282,35 @@ export default function HistoryPage() {
                         <span>{formatDate(reading.created_at)}</span>
                       </div>
                     </div>
+
+                    {Array.isArray(reading.digit_details) && reading.digit_details.length > 0 && (
+                      <div className="border rounded-lg mt-4">
+                        <div className="p-3 border-b font-semibold">รายละเอียดตัวเลข</div>
+                        <div className="p-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                            <div className="font-medium">Predicted</div>
+                            <div className="font-medium">Mapped</div>
+                            <div className="hidden md:block font-medium text-center">ลำดับ</div>
+                            {reading.digit_details.map((d, i) => (
+                              <div key={`${d.predicted_class}-${i}`} className="contents">
+                                <div className="p-2 rounded bg-muted">{d.predicted_class}</div>
+                                <div className="p-2 rounded bg-muted">{d.mapped_value}</div>
+                                <div className="hidden md:block p-2 rounded bg-muted text-center">{i + 1}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-center">
                     <div className="relative w-full max-w-sm">
                       <Image
-                        src={reading.image_url || "/placeholder.svg"}
-                        alt="Meter reading"
-                        width={300}
-                        height={200}
+                        src={reading.image_url || "/placeholder.svg?height=300&width=400&query=uploaded%20meter%20image"}
+                        alt="Meter reading image"
+                        width={400}
+                        height={300}
                         className="rounded-lg border object-cover w-full h-48"
                       />
                     </div>

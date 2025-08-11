@@ -58,6 +58,8 @@ export interface Database {
           room_id: string
           image_url: string
           meter_value: number
+          digit_details: any | null
+          task_id: string | null
           created_at: string
         }
         Insert: {
@@ -67,6 +69,8 @@ export interface Database {
           room_id: string
           image_url: string
           meter_value: number
+          digit_details?: any | null
+          task_id?: string | null
           created_at?: string
         }
         Update: {
@@ -76,6 +80,8 @@ export interface Database {
           room_id?: string
           image_url?: string
           meter_value?: number
+          digit_details?: any | null
+          task_id?: string | null
           created_at?: string
         }
       }
