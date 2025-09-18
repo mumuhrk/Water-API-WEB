@@ -1,29 +1,54 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, CheckCircle } from "lucide-react"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Check for URL parameters
+    const error = searchParams.get("error")
+    const message = searchParams.get("message")
+
+    if (error === "verification_failed") {
+      setError("การยืนยันอีเมลล้มเหลว กรุณาลองใหม่อีกครั้ง")
+    } else if (message === "email_confirmed") {
+      setSuccess("ยืนยันอีเมลสำเร็จ! กรุณาเข้าสู่ระบบ")
+    }
+
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        router.push("/dashboard")
+      }
+    }
+    checkUser()
+  }, [searchParams, supabase.auth, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
+    setSuccess("")
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -32,17 +57,16 @@ export function LoginForm() {
       })
 
       if (error) {
-        // แปลข้อความ error ให้เข้าใจง่ายขึ้น
         if (error.message === "Invalid login credentials") {
-          setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง หรืออาจจะต้องยืนยันอีเมลก่อน")
+          setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง")
         } else if (error.message === "Email not confirmed") {
-          setError("กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ")
+          setError("กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ ตรวจสอบในกล่องจดหมาย")
         } else {
           setError(error.message)
         }
       } else if (data.user) {
-        // Force a hard navigation to ensure proper state update
-        window.location.href = "/dashboard"
+        // Success - redirect will happen automatically via auth state change
+        router.push("/dashboard")
       }
     } catch (err) {
       setError("เกิดข้อผิดพลาดที่ไม่คาดคิด")
@@ -62,6 +86,13 @@ export function LoginForm() {
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {success && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>{success}</AlertDescription>
             </Alert>
           )}
 

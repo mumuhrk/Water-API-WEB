@@ -1,16 +1,14 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, Mail } from "lucide-react"
 
 export function RegisterForm() {
   const [email, setEmail] = useState("")
@@ -19,7 +17,6 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -36,6 +33,7 @@ export function RegisterForm() {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
@@ -43,11 +41,10 @@ export function RegisterForm() {
         setError(error.message)
       } else if (data.user) {
         setSuccess(true)
-        // เก็บ data ไว้ใช้ในการแสดงข้อความ
-        window.registrationData = data
-        setTimeout(() => {
-          window.location.href = "/auth/login"
-        }, 3000) // เพิ่มเวลาให้อ่านข้อความได้
+        // Clear form
+        setEmail("")
+        setPassword("")
+        setFullName("")
       }
     } catch (err) {
       console.error("Registration error:", err)
@@ -55,6 +52,37 @@ export function RegisterForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Mail className="mr-2 h-5 w-5" />
+            ตรวจสอบอีเมล
+          </CardTitle>
+          <CardDescription>เราได้ส่งลิงก์ยืนยันไปยังอีเมลของคุณแล้ว</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert>
+            <Mail className="h-4 w-4" />
+            <AlertDescription>
+              กรุณาตรวจสอบกล่องจดหมายและคลิกลิงก์ยืนยันเพื่อเปิดใช้งานบัญชี
+              <br />
+              <br />
+              หลังจากยืนยันแล้ว คุณจะถูกนำกลับมาที่เว็บไซต์โดยอัตโนมัติ
+            </AlertDescription>
+          </Alert>
+
+          <div className="text-center">
+            <Button variant="outline" onClick={() => setSuccess(false)} className="w-full">
+              สมัครสมาชิกใหม่
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -68,17 +96,6 @@ export function RegisterForm() {
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert>
-              <AlertDescription>
-                สมัครสมาชิกสำเร็จ!
-                {window.registrationData?.user?.email_confirmed_at
-                  ? " กำลังเปลี่ยนเส้นทางไปหน้าเข้าสู่ระบบ..."
-                  : " กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี หรือลองเข้าสู่ระบบได้เลย"}
-              </AlertDescription>
             </Alert>
           )}
 

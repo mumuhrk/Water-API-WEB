@@ -54,6 +54,14 @@ export function Navbar() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
+
+      // Handle logout event
+      if (event === "SIGNED_OUT") {
+        // Clear any cached data
+        setUser(null)
+        // Force hard navigation to login to prevent back button access
+        window.location.replace("/auth/login")
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -61,11 +69,19 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
+      // Clear local storage and session storage
+      localStorage.clear()
+      sessionStorage.clear()
+
+      // Sign out from Supabase
       await supabase.auth.signOut()
-      // Force a hard navigation to ensure proper state update
-      window.location.href = "/auth/login"
+
+      // Force hard navigation and prevent back button
+      window.location.replace("/auth/login")
     } catch (error) {
       console.error("Error logging out:", error)
+      // Force navigation even if logout fails
+      window.location.replace("/auth/login")
     }
   }
 
